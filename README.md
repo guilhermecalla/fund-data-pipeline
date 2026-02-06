@@ -39,4 +39,3 @@ DB_PASS=sua_senha_db
 DB_BASE=nome_do_banco
 ```
 
-**IMPORTANTE:** Nunca commite o arquivo `.env` no Git!
