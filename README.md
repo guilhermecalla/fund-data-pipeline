@@ -6,20 +6,14 @@ Sistema para gerenciamento de dados de fundos usando a API Maravi, com interface
 
 ## Configuração do Ambiente
 
-### 1. Criar ambiente virtual
 
-```console
-conda create -n ops python=3.12
-conda activate ops
-```
-
-### 2. Instalar dependências
+### 1. Instalar dependências
 
 ```console
 pip install -r requirements.txt
 ```
 
-### 3. Configurar variáveis de ambiente
+### 2. Configurar variáveis de ambiente
 
 Copie o arquivo `.env.example` para `.env` e preencha com suas credenciais:
 
@@ -80,13 +74,7 @@ python manage.py pls
 python manage.py operations
 python manage.py carteiras
 
-# Execução em lote com datas padrão
-python manage.py posicao_batch
-python manage.py movimentacao_batch
-python manage.py prices_range
-python manage.py pls_batch
-python manage.py operations_batch
-python manage.py carteiras_batch
+
 
 # Execução em lote com intervalo customizado
 python manage.py posicao_batch --start 2025-01-01 --end 2025-12-31
