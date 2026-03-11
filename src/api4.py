@@ -91,10 +91,13 @@ class MaraviAPI:
                     # Extract portfolio info
                     portfolio_name = portfolio_data.get("name")
                     portfolio_date = portfolio_data.get("date")
-                    
+
+                    # DEBUG: Log all keys in portfolio_data to see what's available
+                    self.logger.info(f"Portfolio {portfolio_name} has keys: {list(portfolio_data.keys())}")
+
                     # Extract instrument positions
                     instrument_positions = portfolio_data.get("instrument_positions", [])
-                    
+
                     for position in instrument_positions:
                         # Add portfolio info to each position
                         position_with_portfolio = position.copy()
@@ -102,11 +105,26 @@ class MaraviAPI:
                         position_with_portfolio["portfolio_id"] = portfolio_id
                         position_with_portfolio["date"] = portfolio_date
                         position_with_portfolio["position_type"] = "POSITION"
-                        
+
                         # Clean data for PostgreSQL
                         cleaned_position = self._clean_data_for_postgres(position_with_portfolio)
                         all_positions.append(cleaned_position)
-                    
+
+                    # Extract fund/quota positions (posições em fundos e cotas)
+                    fund_positions = portfolio_data.get("fund_positions", [])
+
+                    for position in fund_positions:
+                        # Add portfolio info to each position
+                        position_with_portfolio = position.copy()
+                        position_with_portfolio["portfolio_name"] = portfolio_name
+                        position_with_portfolio["portfolio_id"] = portfolio_id
+                        position_with_portfolio["date"] = portfolio_date
+                        position_with_portfolio["position_type"] = "POSITION"
+
+                        # Clean data for PostgreSQL
+                        cleaned_position = self._clean_data_for_postgres(position_with_portfolio)
+                        all_positions.append(cleaned_position)
+
                     # Extract financial transaction positions (provisões)
                     financial_transactions = portfolio_data.get("financial_transaction_positions", [])
                     
@@ -129,8 +147,8 @@ class MaraviAPI:
                         }
                         
                         all_positions.append(provision_position)
-                
-                self.logger.info(f"Extracted {len([p for p in all_positions if p['position_type'] == 'POSITION'])} positions and {len([p for p in all_positions if p['position_type'] == 'PROVISION'])} provisions from {len(portfolios)} portfolios")
+
+                self.logger.info(f"Extracted {len([p for p in all_positions if p['position_type'] == 'POSITION'])} positions (including fund positions) and {len([p for p in all_positions if p['position_type'] == 'PROVISION'])} provisions from {len(portfolios)} portfolios")
                 
             else:
                 self.logger.warning(f"Expected 'objects' key, but found: {list(result.keys())}")

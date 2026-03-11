@@ -185,6 +185,10 @@ class MaraviAPI:
 
         except requests.exceptions.HTTPError as e:
             self.logger.error(f"HTTP error: {str(e)}")
+            try:
+                self.logger.error(f"Response body: {e.response.text}")
+            except Exception:
+                pass
             if e.response.status_code == 401:  # Unauthorized
                 self.logger.info(
                     "Token may have expired. Attempting to reauthenticate..."
