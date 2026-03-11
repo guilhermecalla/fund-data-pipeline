@@ -28,8 +28,8 @@ def append_portfolio_data_simple(df, entity_type="fund_portfolio", schema="tarpo
     
     date_filter = "', '".join(dates_to_check)
     query = f"""
-    SELECT date, portfolio_name, instrument_name, asset_value, position_type
-    FROM {schema}.{table_name} 
+    SELECT date, portfolio_name, instrument_name, asset_value, position_type, book_name
+    FROM {schema}.{table_name}
     WHERE date::date IN ('{date_filter}')
     """
     
@@ -41,19 +41,21 @@ def append_portfolio_data_simple(df, entity_type="fund_portfolio", schema="tarpo
         df_existing = pd.DataFrame()
     
     if not df_existing.empty:
-        # Chave composta para dados agregados
+        # Chave composta para dados agregados (incluindo book_name)
         df['composite_key'] = (
             df['portfolio_name'].astype(str) + '|' +
             df['date'].dt.strftime('%Y-%m-%d') + '|' +
             df['instrument_name'].astype(str) + '|' +
-            df['position_type'].astype(str)
+            df['position_type'].astype(str) + '|' +
+            df['book_name'].astype(str)
         )
-        
+
         df_existing['composite_key'] = (
             df_existing['portfolio_name'].astype(str) + '|' +
             df_existing['date'].astype(str) + '|' +
             df_existing['instrument_name'].astype(str) + '|' +
-            df_existing['position_type'].astype(str)
+            df_existing['position_type'].astype(str) + '|' +
+            df_existing['book_name'].astype(str)
         )
         
         existing_keys = set(df_existing['composite_key'].tolist())
@@ -78,16 +80,19 @@ def append_portfolio_data_simple(df, entity_type="fund_portfolio", schema="tarpo
     else:
         logger.info("Nenhum registro novo para inserir")
 
-def batch():
+def batch(start_date=None, end_date=None, stop_event=None):
     """Execução em lote para múltiplas datas"""
-    datas = pd.date_range(datetime.date(2025, 10, 31), datetime.date(2025,11, 28))
-    
-    df = pd.DataFrame({'date': datas})
-    df['diff_month'] = df.date.dt.month - df.date.shift(-1).dt.month
-    df = df[df.diff_month != 0].copy()
-    
-    for date in df.date.values:
-        data = tarpon_calendar.get_last_trading_day_of_month(date)   
+    if start_date is None:
+        start_date = datetime.date(2025, 10, 31)
+    if end_date is None:
+        end_date = datetime.date(2025, 11, 28)
+
+    for period in pd.period_range(start=start_date, end=end_date, freq='M'):
+        if stop_event and stop_event.is_set():
+            logger.info("Batch interrompido pelo usuário.")
+            break
+        date = period.to_timestamp()  # 1st of each month — avoids month-end edge cases
+        data = tarpon_calendar.get_last_trading_day_of_month(date)
         run(data)
 
 def run(data=None):
@@ -112,12 +117,14 @@ def run(data=None):
         "start_date": datef,
         "end_date": datef,
         "instrument_position_aggregation": 3,
-        "portfolio_ids": [875,1158,1159,1160,1576,1308,843,
-            427,984,144,732,506,161,964,685,499,
-            775,1298,934,1215,1299,1213,
-            657,1211,980,616,1184,1137,1277,
-            1212,1216,774,1303,159,1274,824,1569,
-            653,950,879,164,505,145,1924,1987,1539]
+        "portfolio_ids": [
+      1211,1924,1212,980,1216,616,1215,499,1213,657,775,732,964,774,984,427,161,505,1569,159,1158,
+        1159,1576,824,879,164,145,653,1817,1816,1605,1606,1609,1610,1611,1680,1686,1687,1688,1692,1698,
+        1699,1700,1731,1733,1734,1735,1704,1705,1706,1707,1708,1710,1617,1621,1622,1624,1626,1628,1779,
+        1780,1788,1789,1790,1792,1793,1794,934,2345,1713,1722,1723,1724,1728,1726,1727,1797,1805,1806,1807,
+        1811,1812,1813,1814,1815,1810,1539,1542,1543,1755,1756,1765,1766,1767,1772,1774,1775,1777,1776,1778,
+        1769,144,740,2214
+]
     }
     
     logger.info("Buscando dados na API...")
@@ -156,17 +163,20 @@ def run(data=None):
     if "portfolio_id" in df.columns:
         df["portfolio_id"] = pd.to_numeric(df["portfolio_id"], errors="coerce").astype("Int64")
 
-    # ====== AGREGAÇÃO: GROUP BY data, instrument_name, portfolio_name, position_type ======
+    # Preencher valores nulos em sector_name para evitar perda de registros no groupby
+    if "sector_name" in df.columns:
+        df["sector_name"] = df["sector_name"].fillna("Não utilizar")
+
+    # ====== AGREGAÇÃO: GROUP BY data, instrument_name, portfolio_name, position_type, book_name ======
     logger.info("Agregando dados por instrumento...")
-    
-    groupby_columns = ["date", "portfolio_name", "portfolio_id", "instrument_name", "position_type","sector_name"]
+
+    groupby_columns = ["date", "portfolio_name", "portfolio_id", "instrument_name", "position_type", "book_name", "sector_name"]
     
     # Agregações específicas para cada coluna
     agg_dict = {
         "asset_value": "sum",               # Somar asset_value
         "quantity": "sum",                  # Somar quantity
         "price": "mean",                    # Média do preço
-        "book_name": "first",               # Primeiro book_name
         "pct_net_asset_value": "sum",       # Somar %Exposição
         "pct_asset_value": "sum"            # Somar %Vl. Financeiro
     }

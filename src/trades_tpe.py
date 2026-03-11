@@ -73,9 +73,17 @@ def append_entity_data(df, entity_type, id_column, data, schema="tarpon_base"):
         logger.info("Nenhum registro novo para inserir")
 
 
-def batch():
-    datas = tarpon_calendar.get_business_days_in_range(datetime.date(2020, 1, 1), datetime.date(2025, 8, 26))
+def batch(start_date=None, end_date=None, stop_event=None):
+    if start_date is None:
+        start_date = datetime.date(2020, 1, 1)
+    if end_date is None:
+        end_date = datetime.date(2025, 8, 26)
+
+    datas = tarpon_calendar.get_business_days_in_range(start_date, end_date)
     for data in datas:
+        if stop_event and stop_event.is_set():
+            logger.info("Batch interrompido pelo usuário.")
+            break
         try:
             run(data)
             time.sleep(1)  # Pausa entre requisições

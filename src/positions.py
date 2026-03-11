@@ -143,16 +143,19 @@ def check_data_quality(df):
     return df
 
 
-def batch():
+def batch(start_date=None, end_date=None, stop_event=None):
     """Execução em lote para múltiplas datas"""
-    datas = pd.date_range(datetime.date(2025, 8, 30), datetime.date(2025, 8, 31))
-    
-    df = pd.DataFrame({'date': datas})
-    df['diff_month'] = df.date.dt.month - df.date.shift(-1).dt.month
-    df = df[df.diff_month != 0].copy()
-    
-    for date in df.date.values:
-        data = tarpon_calendar.get_last_trading_day_of_month(date)   
+    if start_date is None:
+        start_date = datetime.date(2025, 10, 28)
+    if end_date is None:
+        end_date = datetime.date(2025, 11, 28)
+
+    for period in pd.period_range(start=start_date, end=end_date, freq='M'):
+        if stop_event and stop_event.is_set():
+            logger.info("Batch interrompido pelo usuário.")
+            break
+        date = period.to_timestamp()  # 1st of each month — avoids month-end edge cases
+        data = tarpon_calendar.get_last_trading_day_of_month(date)
         run(data)
 
 
@@ -187,17 +190,15 @@ def run(data=None):
         "end_date": data.strftime("%Y-%m-%d"),
         #"end_date": "2023-01-31",
         "include_participation": "true",
-        "include_profitability": "true",
-        "include_inactive_records": "false",
+        "include_profitability": "false",
+        "include_ended_receipts": "true",
         "aggregation_mode": 6,
-        "portfolio_ids": [875,1158,1159,1160,1576,1308,843,
-                        427,984,144,732,506,161,964,685,499,
-                        775,1298,934,1215,1299,1213,
-                        657,1211,980,616,1184,1137,1277,
-                        1212,1216,774,1303,159,1274,824,1569,
-                        653,950,879,164,505,145,1924,1987,1539
-                    ],
-        "include_inactive_records": "true"
+        "portfolio_ids": [144, 145, 159, 161, 164, 427, 499, 505, 506, 616, 653,
+                           657, 732, 774, 775, 824, 879, 934, 964, 980, 984, 1158,
+                           1159, 1211, 1212, 1213, 1215, 1216, 1569, 1576, 1924,
+                           2214, 2345, 2352, 2361],
+        "include_inactive_records": "true",
+        "include_irr": "false"
     }
     
     # Buscar dados da API
